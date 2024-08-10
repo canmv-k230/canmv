@@ -727,6 +727,18 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(network_rt_wlan_stop_obj, network_rt_wlan_stop)
 /* NIC Protocol **************************************************************/
 STATIC void network_rt_wlan_socket_close(struct _mod_network_socket_obj_t *socket);
 
+// STATIC int network_rt_wlan_socket_get_error(mod_network_socket_obj_t *_socket) {
+//     int optval;
+//     socklen_t optlen = sizeof(optval);
+
+//     if (getsockopt(_socket->fileno, SOL_SOCKET, SO_ERROR, &optval, &optlen) < 0) {
+//         debug_printf("socket_getsockopt() -> errno %d\n", errno);
+//         return -1;
+//     }
+
+//     return optval;
+// }
+
 STATIC int network_rt_wlan_socket_poll(mod_network_socket_obj_t *_socket, uint32_t rwf, int *_errno) {
 #if 0 // not support now
     int ret = 0;
@@ -789,10 +801,10 @@ STATIC int network_rt_wlan_socket_listening(mod_network_socket_obj_t *_socket, i
     return optval;
 }
 
-STATIC mp_uint_t network_rt_wlan_socket_auto_bind(mod_network_socket_obj_t *socket, int *_errno) {
+STATIC mp_uint_t network_rt_wlan_socket_auto_bind(mod_network_socket_obj_t *_socket, int *_errno) {
 #if 0 // not support now
-    debug_printf("socket_autobind(%d)\n", socket->fileno);
-    if (socket->bound == false && socket->type != MOD_NETWORK_SOCK_RAW) {
+    debug_printf("socket_autobind(%d)\n", _socket->fileno);
+    if (_socket->bound == false && _socket->type != MOD_NETWORK_SOCK_RAW) {
         if (network_rt_wlan_socket_bind(socket, NULL, bind_port, _errno) != 0) {
             *_errno = errno;
             debug_printf("socket_bind() -> errno %d\n", *_errno);
@@ -915,7 +927,7 @@ STATIC int network_rt_wlan_socket_bind(struct _mod_network_socket_obj_t *_socket
     int ret = bind(_socket->fileno, (struct sockaddr*)&addr, sizeof(addr));
     if (ret < 0) {
         *_errno = errno;
-        network_rt_wlan_socket_close(_socket);
+        // network_rt_wlan_socket_close(_socket);
         debug_printf("socket_bind(%d, %d) -> errno: %d\n", _socket->fileno, port, *_errno);
         return -1;
     }
@@ -933,7 +945,7 @@ STATIC int network_rt_wlan_socket_listen(struct _mod_network_socket_obj_t *_sock
     int ret = listen(_socket->fileno, backlog);
     if (ret < 0) {
         *_errno = errno;
-        network_rt_wlan_socket_close(_socket);
+        // network_rt_wlan_socket_close(_socket);
         debug_printf("socket_listen() -> errno %d\n", *_errno);
         return -1;
     }
@@ -959,7 +971,7 @@ STATIC int network_rt_wlan_socket_accept(struct _mod_network_socket_obj_t *_sock
     int fd = accept(_socket->fileno, (struct sockaddr*)&addr, (socklen_t*)&addrlen);
     if (fd < 0) {
         *_errno = errno;
-        network_rt_wlan_socket_close(_socket);
+        // network_rt_wlan_socket_close(_socket);
         debug_printf("socket_accept() -> errno %d\n", *_errno);
         return -1;
     }
@@ -987,7 +999,7 @@ STATIC int network_rt_wlan_socket_connect(struct _mod_network_socket_obj_t *_soc
         *_errno = errno;
         debug_printf("socket_connect() -> errno %d\n", *_errno);
 
-        network_rt_wlan_socket_close(_socket);
+        // network_rt_wlan_socket_close(_socket);
 
         // Poll for write.
         // if (_socket->timeout == 0 ||
@@ -1012,7 +1024,7 @@ STATIC mp_uint_t network_rt_wlan_socket_send(struct _mod_network_socket_obj_t *_
     int ret = send(_socket->fileno, buf, len, 0);
     if (ret < 0) {
         *_errno = errno;
-        network_rt_wlan_socket_close(_socket);
+        // network_rt_wlan_socket_close(_socket);
         debug_printf("socket_send() -> errno %d\n", *_errno);
         return -1;
     }
@@ -1035,17 +1047,14 @@ STATIC mp_uint_t network_rt_wlan_socket_recv(struct _mod_network_socket_obj_t *_
 
     int ret = recv(_socket->fileno, buf, len, MSG_DONTWAIT);
     if (ret < 0) {
-        if(EAGAIN != errno) {
-            *_errno = errno;
-            network_rt_wlan_socket_close(_socket);
-            debug_printf("socket_recv() -> errno %d\n", *_errno);
-            return -1;
-        }
-        return 0;
+        *_errno = errno;
+        // network_rt_wlan_socket_close(_socket);
+        debug_printf("socket_recv() -> errno %d %d\n", *_errno, ret);
+        return -1;
     }
+
     return ret;
 }
-
 
 STATIC mp_uint_t network_rt_wlan_socket_sendto(struct _mod_network_socket_obj_t *_socket, const byte *buf, mp_uint_t len, byte *ip, mp_uint_t port, int *_errno)
 {
@@ -1067,7 +1076,7 @@ STATIC mp_uint_t network_rt_wlan_socket_sendto(struct _mod_network_socket_obj_t 
     int ret = sendto(_socket->fileno, buf, len, 0, (struct sockaddr *)&addr, sizeof(addr));
     if (ret < 0) {
         *_errno = errno;
-        network_rt_wlan_socket_close(_socket);
+        // network_rt_wlan_socket_close(_socket);
         return -1;
     }
     return ret;
@@ -1094,13 +1103,10 @@ STATIC mp_uint_t network_rt_wlan_socket_recvfrom(struct _mod_network_socket_obj_
     *port = 0;
     int ret = recvfrom(_socket->fileno, buf, len, MSG_DONTWAIT, (struct sockaddr *)&addr, &server_addr_len);
     if (ret < 0) {
-        if(EAGAIN != errno) {
-            *_errno = errno;
-            network_rt_wlan_socket_close(_socket);
-            debug_printf("socket_recvfrom() -> errno %d\n", *_errno);
-            return -1;
-        }
-        return 0;
+        *_errno = errno;
+        // network_rt_wlan_socket_close(_socket);
+        debug_printf("socket_recvfrom() -> errno %d\n", *_errno);
+        return -1;
     }
     return ret;
 }
@@ -1120,7 +1126,7 @@ STATIC int network_rt_wlan_socket_setsockopt(struct _mod_network_socket_obj_t *_
     int ret = setsockopt(_socket->fileno, level, opt, optval, optlen);
     if (ret < 0) {
         *_errno = errno;
-        network_rt_wlan_socket_close(_socket);
+        // network_rt_wlan_socket_close(_socket);
         debug_printf("socket_setsockopt() -> errno %d\n", *_errno);
         return -1;
     }
