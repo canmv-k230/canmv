@@ -251,6 +251,12 @@ typedef struct _py_rt_wlan_obj_t {
 
 STATIC int s_wlan_mgmt_dev_fd = -1;
 
+STATIC mp_obj_t network_rt_wlan_active(size_t n_args, const mp_obj_t *args) {
+    mp_printf(&mp_plat_print, "rtwlan not support active.\n");
+    return mp_const_none;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(network_rt_wlan_active_obj, 1, 2, network_rt_wlan_active);
+
 STATIC mp_obj_t network_rt_wlan_scan(size_t n_args, const mp_obj_t *args) {
     CHECK_FD_VALID();
 
@@ -776,7 +782,6 @@ STATIC int network_rt_wlan_socket_poll(mod_network_socket_obj_t *_socket, uint32
 }
 
 STATIC int network_rt_wlan_socke_setblocking(mod_network_socket_obj_t *_socket, bool blocking, int *_errno) {
-#if 0 // not support now
     int nonblocking = !blocking;
     // set socket in non-blocking mode
     if (ioctl(_socket->fileno, FIONBIO, &nonblocking) < 0) {
@@ -784,7 +789,6 @@ STATIC int network_rt_wlan_socke_setblocking(mod_network_socket_obj_t *_socket, 
         network_rt_wlan_socket_close(_socket->fileno);
         return -1;
     }
-#endif
     return 0;
 }
 
@@ -897,7 +901,7 @@ STATIC int network_rt_wlan_socket_socket(struct _mod_network_socket_obj_t *_sock
     _socket->bound = false;
     _socket->callback = MP_OBJ_NULL;
 
-    return network_rt_wlan_socke_setblocking(_socket, false, _errno);
+    return 0; // network_rt_wlan_socke_setblocking(_socket, false, _errno);
 }
 
 STATIC void network_rt_wlan_socket_close(struct _mod_network_socket_obj_t *socket)
@@ -964,8 +968,6 @@ STATIC int network_rt_wlan_socket_accept(struct _mod_network_socket_obj_t *_sock
     struct sockaddr_in addr;
     int addrlen = sizeof(addr);
     addr.sin_family = _socket->domain;
-    addr.sin_port = htons(port);
-    memcpy(&addr.sin_addr, ip, MOD_NETWORK_IPADDR_BUF_SIZE);
 
     *port = 0;
     int fd = accept(_socket->fileno, (struct sockaddr*)&addr, (socklen_t*)&addrlen);
@@ -976,13 +978,16 @@ STATIC int network_rt_wlan_socket_accept(struct _mod_network_socket_obj_t *_sock
         return -1;
     }
 
+    *port = ntohs(addr.sin_port);
+    memcpy(ip, &addr.sin_addr.s_addr, sizeof(addr.sin_addr));
+
     // set socket state
     socket2->fileno = fd;
     socket2->bound = false;
     socket2->timeout = -1;
     socket2->callback = MP_OBJ_NULL;
 
-    return network_rt_wlan_socke_setblocking(socket2, false, _errno);
+    return 0; // network_rt_wlan_socke_setblocking(socket2, false, _errno);
 }
 
 STATIC int network_rt_wlan_socket_connect(struct _mod_network_socket_obj_t *_socket, byte *ip, mp_uint_t port, int *_errno)
@@ -1048,8 +1053,12 @@ STATIC mp_uint_t network_rt_wlan_socket_recv(struct _mod_network_socket_obj_t *_
     int ret = recv(_socket->fileno, buf, len, MSG_DONTWAIT);
     if (ret < 0) {
         *_errno = errno;
-        // network_rt_wlan_socket_close(_socket);
         debug_printf("socket_recv() -> errno %d %d\n", *_errno, ret);
+
+        if(EAGAIN == *_errno) {
+            return 0;
+        }
+        // network_rt_wlan_socket_close(_socket);
         return -1;
     }
 
@@ -1097,17 +1106,23 @@ STATIC mp_uint_t network_rt_wlan_socket_recvfrom(struct _mod_network_socket_obj_
     struct sockaddr_in addr;
     socklen_t server_addr_len = sizeof(addr);
     addr.sin_family = _socket->domain;
-    addr.sin_port = htons(port);
-    memcpy(&addr.sin_addr, ip, MOD_NETWORK_IPADDR_BUF_SIZE);
 
     *port = 0;
     int ret = recvfrom(_socket->fileno, buf, len, MSG_DONTWAIT, (struct sockaddr *)&addr, &server_addr_len);
     if (ret < 0) {
         *_errno = errno;
-        // network_rt_wlan_socket_close(_socket);
         debug_printf("socket_recvfrom() -> errno %d\n", *_errno);
+
+        if(EAGAIN == *_errno) {
+            return 0;
+        }
+        // network_rt_wlan_socket_close(_socket);
         return -1;
     }
+
+    *port = ntohs(addr.sin_port);
+    memcpy(ip, &addr.sin_addr.s_addr, sizeof(addr.sin_addr));
+
     return ret;
 }
 
@@ -1189,6 +1204,7 @@ STATIC int network_rt_wlan_socket_ioctl(struct _mod_network_socket_obj_t *_socke
 
 /* Constants *****************************************************************/
 STATIC const mp_rom_map_elem_t rt_wlan_locals_dict_table[] = {
+    { MP_ROM_QSTR(MP_QSTR_active),              MP_ROM_PTR(&network_rt_wlan_active_obj) },
 // { MP_ROM_QSTR(MP_QSTR_scan),                    MP_ROM_PTR(&network_rt_wlan_scan_obj) },             // only for sta
 // { MP_ROM_QSTR(MP_QSTR_connect),                 MP_ROM_PTR(&network_rt_wlan_connect_obj) },          // only for sta
     { MP_ROM_QSTR(MP_QSTR_disconnect),              MP_ROM_PTR(&network_rt_wlan_disconnect_obj) },
