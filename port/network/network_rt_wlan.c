@@ -1021,7 +1021,7 @@ STATIC mp_uint_t network_rt_wlan_socket_send(struct _mod_network_socket_obj_t *_
 
 STATIC mp_uint_t network_rt_wlan_socket_recv(struct _mod_network_socket_obj_t *_socket, byte *buf, mp_uint_t len, int *_errno)
 {
-    debug_printf("socket_recv(%d)\n", _socket->fileno);
+    debug_printf("socket_recv(%d), len %d\n", _socket->fileno, len);
 
     // check if socket in listening state.
     if (network_rt_wlan_socket_listening(_socket, _errno) == 1) {
@@ -1033,12 +1033,15 @@ STATIC mp_uint_t network_rt_wlan_socket_recv(struct _mod_network_socket_obj_t *_
         return -1;
     }
 
-    int ret = recv(_socket->fileno, buf, len, 0);
+    int ret = recv(_socket->fileno, buf, len, MSG_DONTWAIT);
     if (ret < 0) {
-        *_errno = errno;
-        network_rt_wlan_socket_close(_socket);
-        debug_printf("socket_recv() -> errno %d\n", *_errno);
-        return -1;
+        if(EAGAIN != errno) {
+            *_errno = errno;
+            network_rt_wlan_socket_close(_socket);
+            debug_printf("socket_recv() -> errno %d\n", *_errno);
+            return -1;
+        }
+        return 0;
     }
     return ret;
 }
@@ -1072,7 +1075,7 @@ STATIC mp_uint_t network_rt_wlan_socket_sendto(struct _mod_network_socket_obj_t 
 
 STATIC mp_uint_t network_rt_wlan_socket_recvfrom(struct _mod_network_socket_obj_t *_socket, byte *buf, mp_uint_t len, byte *ip, mp_uint_t *port, int *_errno)
 {
-    debug_printf("socket_recvfrom(%d)\n", _socket->fileno);
+    debug_printf("socket_recvfrom(%d), len %d\n", _socket->fileno, len);
     // Auto-bind the socket first if the socket is unbound.
     if (network_rt_wlan_socket_auto_bind(_socket, _errno) != 0) {
         return -1;
@@ -1089,12 +1092,15 @@ STATIC mp_uint_t network_rt_wlan_socket_recvfrom(struct _mod_network_socket_obj_
     memcpy(&addr.sin_addr, ip, MOD_NETWORK_IPADDR_BUF_SIZE);
 
     *port = 0;
-    int ret = recvfrom(_socket->fileno, buf, len, 0, (struct sockaddr *)&addr, &server_addr_len);
+    int ret = recvfrom(_socket->fileno, buf, len, MSG_DONTWAIT, (struct sockaddr *)&addr, &server_addr_len);
     if (ret < 0) {
-        *_errno = errno;
-        network_rt_wlan_socket_close(_socket);
-        debug_printf("socket_recvfrom() -> errno %d\n", *_errno);
-        return -1;
+        if(EAGAIN != errno) {
+            *_errno = errno;
+            network_rt_wlan_socket_close(_socket);
+            debug_printf("socket_recvfrom() -> errno %d\n", *_errno);
+            return -1;
+        }
+        return 0;
     }
     return ret;
 }
