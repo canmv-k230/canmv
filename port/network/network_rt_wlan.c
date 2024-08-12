@@ -731,6 +731,11 @@ STATIC mp_obj_t network_rt_wlan_stop(mp_obj_t self_in) {
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(network_rt_wlan_stop_obj, network_rt_wlan_stop);
 
 /* NIC Protocol **************************************************************/
+struct network_priv {
+    int recv_flag;
+    int send_flag;
+};
+
 STATIC void network_rt_wlan_socket_close(struct _mod_network_socket_obj_t *socket);
 
 // STATIC int network_rt_wlan_socket_get_error(mod_network_socket_obj_t *_socket) {
@@ -782,6 +787,7 @@ STATIC int network_rt_wlan_socket_poll(mod_network_socket_obj_t *_socket, uint32
 }
 
 STATIC int network_rt_wlan_socke_setblocking(mod_network_socket_obj_t *_socket, bool blocking, int *_errno) {
+#if 0
     int nonblocking = !blocking;
     // set socket in non-blocking mode
     if (ioctl(_socket->fileno, FIONBIO, &nonblocking) < 0) {
@@ -789,6 +795,17 @@ STATIC int network_rt_wlan_socke_setblocking(mod_network_socket_obj_t *_socket, 
         network_rt_wlan_socket_close(_socket->fileno);
         return -1;
     }
+#else
+    struct network_priv *priv = (struct network_priv*)_socket->_private;
+    if(priv) {
+        if(blocking) {
+            priv->recv_flag = MSG_DONTWAIT;
+        } else {
+            priv->recv_flag = 0;
+        }
+    }
+#endif
+
     return 0;
 }
 
@@ -901,7 +918,20 @@ STATIC int network_rt_wlan_socket_socket(struct _mod_network_socket_obj_t *_sock
     _socket->bound = false;
     _socket->callback = MP_OBJ_NULL;
 
-    return 0; // network_rt_wlan_socke_setblocking(_socket, false, _errno);
+    _socket->_private = m_new_obj(struct network_priv);
+
+    struct network_priv *priv = (struct network_priv*)_socket->_private;
+    priv->recv_flag = 0;
+    priv->send_flag = 0;
+
+    // default set recv timeout
+    struct timeval timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 50 * 1000;
+
+    return setsockopt(_socket->fileno, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+
+    // return 0; // network_rt_wlan_socke_setblocking(_socket, false, _errno);
 }
 
 STATIC void network_rt_wlan_socket_close(struct _mod_network_socket_obj_t *socket)
@@ -911,6 +941,11 @@ STATIC void network_rt_wlan_socket_close(struct _mod_network_socket_obj_t *socke
         // socket->callback = MP_OBJ_NULL;
         // mp_obj_list_remove(MP_STATE_PORT(mp_wifi_sockpoll_list), socket);
         // mp_sched_unlock();
+    }
+
+    struct network_priv *priv = (struct network_priv*)socket->_private;
+    if(priv) {
+        m_del_obj(struct network_priv, priv);
     }
 
     if (socket->fileno >= 0) {
@@ -987,7 +1022,20 @@ STATIC int network_rt_wlan_socket_accept(struct _mod_network_socket_obj_t *_sock
     socket2->timeout = -1;
     socket2->callback = MP_OBJ_NULL;
 
-    return 0; // network_rt_wlan_socke_setblocking(socket2, false, _errno);
+    socket2->_private = m_new_obj(struct network_priv);
+
+    struct network_priv *priv = (struct network_priv*)socket2->_private;
+    priv->recv_flag = 0;
+    priv->send_flag = 0;
+
+    // default set recv timeout
+    struct timeval timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 50 * 1000;
+
+    return setsockopt(_socket->fileno, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+
+    // return 0; // network_rt_wlan_socke_setblocking(socket2, false, _errno);
 }
 
 STATIC int network_rt_wlan_socket_connect(struct _mod_network_socket_obj_t *_socket, byte *ip, mp_uint_t port, int *_errno)
@@ -1050,14 +1098,16 @@ STATIC mp_uint_t network_rt_wlan_socket_recv(struct _mod_network_socket_obj_t *_
         return -1;
     }
 
-    int ret = recv(_socket->fileno, buf, len, MSG_DONTWAIT);
+    int flag = 0;
+    struct network_priv *priv = (struct network_priv*)_socket->_private;
+    if(priv) {
+        flag = priv->recv_flag;
+    }
+
+    int ret = recv(_socket->fileno, buf, len, flag);
     if (ret < 0) {
         *_errno = errno;
         debug_printf("socket_recv() -> errno %d %d\n", *_errno, ret);
-
-        if(EAGAIN == *_errno) {
-            return 0;
-        }
         // network_rt_wlan_socket_close(_socket);
         return -1;
     }
@@ -1107,15 +1157,17 @@ STATIC mp_uint_t network_rt_wlan_socket_recvfrom(struct _mod_network_socket_obj_
     socklen_t server_addr_len = sizeof(addr);
     addr.sin_family = _socket->domain;
 
+    int flag = 0;
+    struct network_priv *priv = (struct network_priv*)_socket->_private;
+    if(priv) {
+        flag = priv->recv_flag;
+    }
+
     *port = 0;
-    int ret = recvfrom(_socket->fileno, buf, len, MSG_DONTWAIT, (struct sockaddr *)&addr, &server_addr_len);
+    int ret = recvfrom(_socket->fileno, buf, len, flag, (struct sockaddr *)&addr, &server_addr_len);
     if (ret < 0) {
         *_errno = errno;
         debug_printf("socket_recvfrom() -> errno %d\n", *_errno);
-
-        if(EAGAIN == *_errno) {
-            return 0;
-        }
         // network_rt_wlan_socket_close(_socket);
         return -1;
     }

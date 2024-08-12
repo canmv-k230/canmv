@@ -102,6 +102,7 @@ extern const struct _mp_obj_fun_builtin_var_t network_wlan_make_new_obj;
 #define MICROPY_PY_SOCKET           (1)
 #define MICROPY_PY_NETWORK          (1)
 #define MICROPY_PY_NETWORK_HOSTNAME_DEFAULT "canmv k230"
+#define MICROPY_PY_SOCKET_EXTENDED_STATE  (1)
 #define MICROPY_PORT_NETWORK_INTERFACES \
     MICROPY_BOARD_NETWORK_RT_WLAN
 
