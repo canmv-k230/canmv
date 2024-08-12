@@ -27,7 +27,7 @@ copy_examples:
 	@if [ ! -d ${SDK_BUILD_IMAGES_DIR}/sdcard/examples ]; then \
 		mkdir -p ${SDK_BUILD_IMAGES_DIR}/sdcard/examples/; \
 	fi; \
-	rsync -aq --delete $(SDK_CANMV_SRC_DIR)/resources/examples/ ${SDK_BUILD_IMAGES_DIR}/sdcard/examples/
+	rsync -aq --delete --exclude='.git' $(SDK_CANMV_SRC_DIR)/resources/examples/ ${SDK_BUILD_IMAGES_DIR}/sdcard/examples/
 
 .PHONY: copy_micropython
 copy_micropython:
