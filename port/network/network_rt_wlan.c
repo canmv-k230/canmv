@@ -1079,6 +1079,11 @@ STATIC mp_uint_t network_rt_wlan_socket_recv(struct _mod_network_socket_obj_t *_
         *_errno = errno;
         debug_printf("socket_recv() -> errno %d %d\n", *_errno, ret);
         // network_rt_wlan_socket_close(_socket);
+
+        if(EAGAIN == *_errno) {
+            return 0;
+        }
+
         return -1;
     }
 
@@ -1133,6 +1138,11 @@ STATIC mp_uint_t network_rt_wlan_socket_recvfrom(struct _mod_network_socket_obj_
         *_errno = errno;
         debug_printf("socket_recvfrom() -> errno %d\n", *_errno);
         // network_rt_wlan_socket_close(_socket);
+
+        if(EAGAIN == *_errno) {
+            return 0;
+        }
+
         return -1;
     }
 
