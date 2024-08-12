@@ -782,7 +782,6 @@ STATIC int network_rt_wlan_socket_poll(mod_network_socket_obj_t *_socket, uint32
 }
 
 STATIC int network_rt_wlan_socke_setblocking(mod_network_socket_obj_t *_socket, bool blocking, int *_errno) {
-#if 0
     int nonblocking = !blocking;
     // set socket in non-blocking mode
     if (ioctl(_socket->fileno, FIONBIO, &nonblocking) < 0) {
@@ -790,7 +789,6 @@ STATIC int network_rt_wlan_socke_setblocking(mod_network_socket_obj_t *_socket, 
         network_rt_wlan_socket_close(_socket->fileno);
         return -1;
     }
-#endif
 
     return 0;
 }
@@ -907,7 +905,7 @@ STATIC int network_rt_wlan_socket_socket(struct _mod_network_socket_obj_t *_sock
     // default set recv timeout
     struct timeval timeout;
     timeout.tv_sec = 0;
-    timeout.tv_usec = 500 * 1000;
+    timeout.tv_usec = 50 * 1000;
 
     return setsockopt(_socket->fileno, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
@@ -1009,7 +1007,7 @@ STATIC int network_rt_wlan_socket_accept(struct _mod_network_socket_obj_t *_sock
     // default set recv timeout
     struct timeval timeout;
     timeout.tv_sec = 0;
-    timeout.tv_usec = 500 * 1000;
+    timeout.tv_usec = 50 * 1000;
 
     return setsockopt(socket2->fileno, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
