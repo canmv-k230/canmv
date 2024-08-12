@@ -927,7 +927,7 @@ STATIC int network_rt_wlan_socket_socket(struct _mod_network_socket_obj_t *_sock
     // default set recv timeout
     struct timeval timeout;
     timeout.tv_sec = 0;
-    timeout.tv_usec = 50 * 1000;
+    timeout.tv_usec = 500 * 1000;
 
     return setsockopt(_socket->fileno, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
@@ -1005,7 +1005,16 @@ STATIC int network_rt_wlan_socket_accept(struct _mod_network_socket_obj_t *_sock
     addr.sin_family = _socket->domain;
 
     *port = 0;
-    int fd = accept(_socket->fileno, (struct sockaddr*)&addr, (socklen_t*)&addrlen);
+    int fd = -1;
+
+    do {
+        fd = accept(_socket->fileno, (struct sockaddr*)&addr, (socklen_t*)&addrlen);
+        if((0 <= fd) || (EAGAIN != errno)) {
+            break;
+        }
+        mp_hal_delay_ms(100);
+    } while(0 > fd);
+
     if (fd < 0) {
         *_errno = errno;
         // network_rt_wlan_socket_close(_socket);
@@ -1031,9 +1040,9 @@ STATIC int network_rt_wlan_socket_accept(struct _mod_network_socket_obj_t *_sock
     // default set recv timeout
     struct timeval timeout;
     timeout.tv_sec = 0;
-    timeout.tv_usec = 50 * 1000;
+    timeout.tv_usec = 500 * 1000;
 
-    return setsockopt(_socket->fileno, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+    return setsockopt(socket2->fileno, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
     // return 0; // network_rt_wlan_socke_setblocking(socket2, false, _errno);
 }
