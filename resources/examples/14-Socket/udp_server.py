@@ -1,18 +1,31 @@
 #配置 tcp/udp socket调试工具
 import socket
-import time
+import time,os
 import network
 
+def network_use_wlan(is_wlan=True):
+    if is_wlan:
+        sta=network.WLAN(0)
+        sta.connect("Canaan","Canaan314")
+        print(sta.status())
+        while sta.ifconfig()[0] == '0.0.0.0':
+            os.exitpoint()
+        print(sta.ifconfig())
+        ip = sta.ifconfig()[0]
+        return ip
+    else:
+        a=network.LAN()
+        if(a.active()):
+            a.active(0)
+        a.active(1)
+        a.ifconfig("dhcp")
+        print(a.ifconfig())
+        ip = a.ifconfig()[0]
+        return ip
 
 def udpserver():
     #获取lan接口
-    a=network.LAN()
-    if(a.active()):
-        a.active(0)
-    a.active(1)
-    a.ifconfig("dhcp")
-    ip = a.ifconfig()[0]
-    print(a.ifconfig())
+    ip = network_use_wlan(True)
         
     #获取地址及端口号对应地址
     ai = socket.getaddrinfo(ip, 8080)
@@ -20,28 +33,28 @@ def udpserver():
     print("Address infos:", ai)
     addr = ai[0][-1]
 
-    print("udp server %s port:%d\n" % ((network.LAN().ifconfig()[0]),8080))
+    print("udp server %s port:%d\n" % ((ip),8080))
     #建立socket
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     #设置属性
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     #绑定
     s.bind(addr)
-    print("a")
     #延时
     time.sleep(1)
-
-    for j in range(10):
-        try:
-            #接受内容
-            data, addr = s.recvfrom(800)
-            print("b")
-        except:
+    
+    counter=0
+    while True :
+        os.exitpoint()
+        data, addr = s.recvfrom(800)
+        if data == b"":
             continue
-        #打印内容
-        print("recv %d" % j,data,addr)
+        print("recv %d" % counter,data,addr)
         #回复内容
-        s.sendto(b"%s have recv count=%d " % (data,j), addr)
+        s.sendto(b"%s have recv count=%d " % (data,counter), addr)
+        counter = counter+1
+        if counter > 10 :
+            break
     #关闭
     s.close()
     print("udp server exit!!")

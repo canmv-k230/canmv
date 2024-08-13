@@ -1,7 +1,7 @@
 # port from micropython/examples/network/http_server.py
 import socket
 import network
-import time
+import time,os
 # print(network.LAN().ifconfig()[0])
 # print("Listening, connect your browser to http://%s:8081/" % (network.LAN().ifconfig()[0]))
 
@@ -11,14 +11,29 @@ HTTP/1.0 200 OK
 Hello #%d from k230 canmv MicroPython!
 """
 
+def network_use_wlan(is_wlan=True):
+    if is_wlan:
+        sta=network.WLAN(0)
+        sta.connect("Canaan","Canaan314")
+        print(sta.status())
+        while sta.ifconfig()[0] == '0.0.0.0':
+            os.exitpoint()
+        print(sta.ifconfig())
+        ip = sta.ifconfig()[0]
+        return ip
+    else:
+        a=network.LAN()
+        if(a.active()):
+            a.active(0)
+        a.active(1)
+        a.ifconfig("dhcp")
+        print(a.ifconfig())
+        ip = a.ifconfig()[0]
+        return ip
 
 def main(micropython_optimize=True):
     #获取lan接口
-    a=network.LAN()
-    if(a.active()):
-        a.active(0)
-    a.active(1)
-    a.ifconfig("dhcp")
+    ip = network_use_wlan(True)
     
     #建立socket
     s = socket.socket()
@@ -33,7 +48,7 @@ def main(micropython_optimize=True):
     s.bind(addr)
     #开始监听
     s.listen(5)
-    print("Listening, connect your browser to http://%s:8081/" % (network.LAN().ifconfig()[0]))
+    print("Listening, connect your browser to http://%s:8081/" % (ip))
 
     counter = 0
     while True:
@@ -44,7 +59,7 @@ def main(micropython_optimize=True):
         print("Client address:", client_addr)
         print("Client socket:", client_sock)
         #非阻塞模式
-        client_sock.setblocking(False)
+        client_sock.setblocking(True)
         if not micropython_optimize:
             # To read line-oriented protocol (like HTTP) from a socket (and
             # avoid short read problem), it must be wrapped in a stream (aka
@@ -58,17 +73,16 @@ def main(micropython_optimize=True):
             # may take this shortcut to save resources.
             client_stream = client_sock
 
-        print("Request:")
-        #获取内容
-        req = client_stream.read()
-        print(req)
-        
         while True:
             ##获取内容
-            h = client_stream.read()            
-            if h == b"" or h == b"\r\n":
-                break
+            h = client_stream.read()
+            if h == None:
+                continue
             print(h)
+            if h.endswith(b'\r\n\r\n'):
+                break
+            os.exitpoint()
+
         #回复内容
         client_stream.write(CONTENT % counter)
         #time.sleep(0.5)

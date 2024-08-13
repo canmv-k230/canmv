@@ -1,21 +1,36 @@
 #配置 tcp/udp socket调试工具
 import network
 import socket
-import time
+import os,time
+
+def network_use_wlan(is_wlan=True):
+    if is_wlan:
+        sta=network.WLAN(0)
+        sta.connect("Canaan","Canaan314")
+        print(sta.status())
+        while sta.ifconfig()[0] == '0.0.0.0':
+            os.exitpoint()
+        print(sta.ifconfig())
+        ip = sta.ifconfig()[0]
+        return ip
+    else:
+        a=network.LAN()
+        if(a.active()):
+            a.active(0)
+        a.active(1)
+        a.ifconfig("dhcp")
+        print(a.ifconfig())
+        ip = a.ifconfig()[0]
+        return ip
 
 def client():
     #获取lan接口
-    a=network.LAN()
-    if(a.active()):
-        a.active(0)
-    a.active(1)
-    a.ifconfig("dhcp")
-    print(a.ifconfig())
+    network_use_wlan(True)
     
     #建立socket
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
     #获取地址及端口号 对应地址
-    ai = socket.getaddrinfo("172.16.1.174", 8080)
+    ai = socket.getaddrinfo("192.168.1.110", 8080)
     #ai = socket.getaddrinfo("10.10.1.94", PORT)
     print("Address infos:", ai)
     addr = ai[0][-1]

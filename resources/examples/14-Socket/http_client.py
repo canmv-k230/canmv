@@ -1,18 +1,31 @@
 import network
 import socket
+import os,time
 
+def network_use_wlan(is_wlan=True):
+    if is_wlan:
+        sta=network.WLAN(0)
+        sta.connect("Canaan","Canaan314")
+        print(sta.status())
+        while sta.ifconfig()[0] == '0.0.0.0':
+            os.exitpoint()
+        print(sta.ifconfig())
+        ip = sta.ifconfig()[0]
+        return ip
+    else:
+        a=network.LAN()
+        if(a.active()):
+            a.active(0)
+        a.active(1)
+        a.ifconfig("dhcp")
+        print(a.ifconfig())
+        ip = a.ifconfig()[0]
+        return ip
 
 def main(use_stream=True):
     
     #获取lan接口
-    a=network.LAN()
-    if(a.active()):
-        a.active(0)
-    a.active(1)
-    a.ifconfig("dhcp")
-    
-    print(a.ifconfig())
-    print(a.config("mac"))
+    network_use_wlan(True)
     #创建socket
     s = socket.socket()
     #获取地址及端口号 对应地址

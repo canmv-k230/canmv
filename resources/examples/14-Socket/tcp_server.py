@@ -1,27 +1,39 @@
 #配置 tcp/udp socket调试工具
 import socket
 import network
-import time
+import time,os
 
 
 CONTENT = b"""
 Hello #%d from k230 canmv MicroPython!
 """
-
+def network_use_wlan(is_wlan=True):
+    if is_wlan:
+        sta=network.WLAN(0)
+        sta.connect("Canaan","Canaan314")
+        print(sta.status())
+        while sta.ifconfig()[0] == '0.0.0.0':
+            os.exitpoint()
+        print(sta.ifconfig())
+        ip = sta.ifconfig()[0]
+        return ip
+    else:
+        a=network.LAN()
+        if(a.active()):
+            a.active(0)
+        a.active(1)
+        a.ifconfig("dhcp")
+        print(a.ifconfig())
+        ip = a.ifconfig()[0]
+        return ip
 
 
 def server():
     #获取lan接口
-    a=network.LAN()
-    if(a.active()):
-        a.active(0)
-    a.active(1)
-    a.ifconfig("dhcp")
-    ip = a.ifconfig()[0]
-    print(a.ifconfig())
-    
+    ip = network_use_wlan(True)
+
     counter=1
-    
+
     #建立socket
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
     #设置属性
@@ -35,7 +47,7 @@ def server():
     s.bind(addr)
     #监听
     s.listen(5)
-    print("tcp server %s port:%d\n" % ((network.LAN().ifconfig()[0]),8080))
+    print("tcp server %s port:%d\n" % ((ip),8080))
 
 
     while True:
@@ -54,22 +66,24 @@ def server():
         while True:
             #读取内容
             h = client_stream.read()
+            if h == None :
+                continue
             if h != b"" :
                 print(h)
                 #回复内容
                 client_stream.write("recv :%s" % h)
-
             if "end" in h :
                 #关闭socket
                 client_stream.close()
                 break
-
+            os.exitpoint()
+            
         counter += 1
         if counter > 10 :
             print("server exit!")
             #关闭
             s.close()
             break
-
+        os.exitpoint()
 #main()
 server()
