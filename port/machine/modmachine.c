@@ -50,6 +50,8 @@
 
 #if MICROPY_PY_MACHINE
 
+extern const mp_obj_type_t machine_i2c_slave_type;
+
 STATIC mp_obj_t machine_reset(void) {
     int fd = open("/dev/mem", O_RDWR | O_SYNC);
     if (fd < 0)
@@ -120,7 +122,8 @@ STATIC const mp_rom_map_elem_t machine_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_SPI), MP_ROM_PTR(&machine_spi_type) },
     { MP_ROM_QSTR(MP_QSTR_RTC), MP_ROM_PTR(&machine_rtc_type) },
     { MP_ROM_QSTR(MP_QSTR_TOUCH), MP_ROM_PTR(&machine_touch_type) },
-    { MP_ROM_QSTR(MP_QSTR_LED), MP_ROM_PTR(&machine_led_type) }
+    { MP_ROM_QSTR(MP_QSTR_LED), MP_ROM_PTR(&machine_led_type) },
+    { MP_ROM_QSTR(MP_QSTR_I2C_Slave), MP_ROM_PTR(&machine_i2c_slave_type) }
 };
 
 STATIC MP_DEFINE_CONST_DICT(machine_module_globals, machine_module_globals_table);
