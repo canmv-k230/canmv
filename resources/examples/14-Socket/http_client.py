@@ -14,9 +14,6 @@ def network_use_wlan(is_wlan=True):
         return ip
     else:
         a=network.LAN()
-        if(a.active()):
-            a.active(0)
-        a.active(1)
         a.ifconfig("dhcp")
         print(a.ifconfig())
         ip = a.ifconfig()[0]
