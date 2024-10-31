@@ -4,6 +4,7 @@ from mpp.vo import *
 from media.media import *
 import image
 import machine
+import os
 
 
 class Display:
@@ -154,7 +155,11 @@ class Display:
             if (Display.LAYER_VIDEO1 <= layer <= Display.LAYER_VIDEO2):
                 print(f"layer({layer}) not support alpha, ignore it.")
 
-        flag = kwargs.get('flag', 0)
+        brd = os.uname()[-1]
+        if brd == "k230d_canmv_atk_dnk230d":
+            flag = kwargs.get('flag', Display.FLAG_ROTATION_90)
+        else:
+            flag = kwargs.get('flag', 0)
 
         if cls._layer_bind_cfg[layer] is not None:
             cls.unbind_layer(layer)
@@ -217,9 +222,15 @@ class Display:
             elif _type == Display.HX8377:
                 cls._connector_type = HX8377_V2_MIPI_4LAN_1080X1920_30FPS
             elif _type == Display.ST7701:
-                _width = width if width is not None else 800
-                _height = height if height is not None else 480
-                _flag = flag if flag is not None else Display.FLAG_ROTATION_90
+                brd = os.uname()[-1]
+                if brd == "k230d_canmv_atk_dnk230d":
+                    _width = width if width is not None else 640
+                    _height = height if height is not None else 480
+                    _flag = flag if flag is not None else Display.FLAG_ROTATION_90
+                else:
+                    _width = width if width is not None else 800
+                    _height = height if height is not None else 480
+                    _flag = flag if flag is not None else Display.FLAG_ROTATION_90
 
                 cls._connector_is_st7701 = True
 

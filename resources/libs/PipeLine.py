@@ -55,6 +55,8 @@ class PipeLine:
                 self.sensor = Sensor(fps=30) if sensor is None else sensor
             elif brd=="k230_canmv_lckfb":
                 self.sensor = Sensor(fps=30) if sensor is None else sensor
+            elif brd=="k230d_canmv_atk_dnk230d":
+                self.sensor = Sensor(fps=30) if sensor is None else sensor
             else:
                 self.sensor = Sensor(fps=fps) if sensor is None else sensor
             self.sensor.reset()
