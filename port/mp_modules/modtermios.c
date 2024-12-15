@@ -35,6 +35,10 @@
 
 #if MICROPY_PY_TERMIOS
 
+#define RAISE_ERRNO(err_flag, error_val) \
+    { if (err_flag == -1) \
+      { mp_raise_OSError(error_val); } }
+
 STATIC mp_obj_t mod_termios_tcgetattr(mp_obj_t fd_in) {
     struct termios term;
     int fd = mp_obj_get_int(fd_in);

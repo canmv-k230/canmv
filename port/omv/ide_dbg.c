@@ -51,6 +51,8 @@
 
 #include "mpp_vb_mgmt.h"
 
+#include "canmv_drivers.h"
+
 #if CONFIG_CANMV_IDE_SUPPORT
 
 #define COLOR_NONE "\033[0m"
@@ -1192,15 +1194,7 @@ void sighandler(int sig) {
 void ide_dbg_init(void) {
     pr_info("IDE debugger built %s %s", __DATE__, __TIME__);
 
-    {
-#define MISC_DEV_CMD_GET_MEMORY_SIZE    (0x1024 + 6)
-
-        int fd = open("/dev/canmv_misc", O_RDONLY);
-        if(0 <= fd) {
-            ioctl(fd, MISC_DEV_CMD_GET_MEMORY_SIZE, &sys_mem_total_size);
-            close(fd);
-        }
-    }
+    canmv_misc_dev_ioctl(MISC_DEV_CMD_GET_MEMORY_SIZE, &sys_mem_total_size);
 
     usb_cdc_fd = open("/dev/ttyUSB", O_RDWR);
     if (usb_cdc_fd < 0) {

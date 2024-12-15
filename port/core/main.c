@@ -61,7 +61,6 @@
 #include "extmod/vfs_posix.h"
 #include "extmod/modnetwork.h"
 #include "genhdr/mpversion.h"
-#include "input.h"
 
 #include "mpp_vb_mgmt.h"
 

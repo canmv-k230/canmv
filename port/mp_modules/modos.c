@@ -25,7 +25,7 @@
  * THE SOFTWARE.
  */
 
-#include <errno.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -33,9 +33,12 @@
 #include "py/runtime.h"
 #include "py/mphal.h"
 
-#include <stdio.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
+#include <sys/random.h>
+
+#include "canmv_drivers.h"
 
 STATIC mp_obj_t mp_os_getenv(size_t n_args, const mp_obj_t *args) {
     const char *s = getenv(mp_obj_str_get_str(args[0]));
@@ -84,24 +87,11 @@ STATIC mp_obj_t mp_os_unsetenv(mp_obj_t key_in) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mp_os_unsetenv_obj, mp_os_unsetenv);
 
-STATIC mp_obj_t mp_os_system(mp_obj_t cmd_in) {
-    const char *cmd = mp_obj_str_get_str(cmd_in);
-
-    MP_THREAD_GIL_EXIT();
-    int r = system(cmd);
-    MP_THREAD_GIL_ENTER();
-
-    RAISE_ERRNO(r, errno);
-
-    return MP_OBJ_NEW_SMALL_INT(r);
-}
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(mp_os_system_obj, mp_os_system);
-
 STATIC mp_obj_t mp_os_urandom(mp_obj_t num) {
     mp_int_t n = mp_obj_get_int(num);
     vstr_t vstr;
     vstr_init_len(&vstr, n);
-    mp_hal_get_random(n, vstr.buf);
+    getrandom(vstr.buf, n, GRND_RANDOM);
     return mp_obj_new_bytes_from_vstr(&vstr);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mp_os_urandom_obj, mp_os_urandom);
@@ -134,14 +124,12 @@ STATIC mp_obj_t mp_os_exitpoint(size_t n_args, const mp_obj_t *args) {
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mp_os_exitpoint_obj, 0, 1, mp_os_exitpoint);
 
 STATIC mp_obj_t mp_os_get_cpu_usage(size_t n_args, const mp_obj_t *args) {
-#define MISC_DEV_CMD_CPU_USAGE (0x1024 + 2)
+    int usage = -1;
 
-    int fd = -1, usage = -1;
+    if(0x00 != canmv_misc_dev_ioctl(MISC_DEV_CMD_CPU_USAGE, &usage)) {
+        mp_printf(&mp_plat_print, "os get cpu_usage failed.\n");
 
-    fd = open("/dev/canmv_misc", O_RDONLY);
-    if(0 < fd) {
-        ioctl(fd, MISC_DEV_CMD_CPU_USAGE, &usage);
-        close(fd);
+        usage = -1;
     }
 
     return MP_OBJ_NEW_SMALL_INT(usage);

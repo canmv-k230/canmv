@@ -26,13 +26,16 @@
 
 #include <stddef.h>
 #include <stdio.h>
-#include <sys/select.h>
-#include <sys/random.h>
-#include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <unistd.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <time.h>
+#include <sys/time.h>
+#include <sys/ioctl.h>
+#include <sys/select.h>
 
 #include "py/mphal.h"
 #include "py/mpthread.h"
@@ -54,10 +57,11 @@ extern void interrupt_ide(void);
 STATIC void sigint_handler_other(int signum) {
     if (signum == SIGINT) {
         process_exit = true;
-        if (ide_dbg_attach())
+        if (ide_dbg_attach()) {
             interrupt_ide();
-        else
+        } else {
             interrupt_repl();
+        }
     }
 }
 
@@ -126,6 +130,13 @@ void mp_hal_stdio_mode_orig(void) {
 }
 
 #endif
+///////////////////////////////////////////////////////////////////////////////
+// mp_hal stdin & stdout //////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+// uintptr_t mp_hal_stdio_poll(uintptr_t poll_flags)
+// {
+
+// }
 
 int mp_hal_stdin_rx_chr(void) {
     int c;
@@ -139,6 +150,10 @@ int mp_hal_stdin_rx_chr(void) {
         mp_handle_pending(true);
     }
     return c;
+}
+
+void mp_hal_stdout_tx_str(const char *str) {
+    mp_hal_stdout_tx_strn(str, strlen(str));
 }
 
 void mp_hal_stdout_tx_strn(const char *str, size_t len) {
@@ -173,14 +188,63 @@ void mp_hal_stdout_tx_strn_cooked(const char *str, size_t len) {
         mp_hal_stdout_tx_strn(str + last_seg, len - last_seg);
 }
 
-void mp_hal_stdout_tx_str(const char *str) {
-    mp_hal_stdout_tx_strn(str, strlen(str));
-}
-
+// k230 added
 void mp_hal_stdout_tx_str_cooked(const char* str) {
     mp_hal_stdout_tx_strn_cooked(str, strlen(str));
 }
+///////////////////////////////////////////////////////////////////////////////
+// mp_hal delay ///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+void mp_hal_delay_us(mp_uint_t us) {
+    mp_uint_t start = mp_hal_ticks_us();
+    mp_uint_t stop = start + us;
 
-void mp_hal_get_random(size_t n, void *buf) {
-    getrandom(buf, n, GRND_RANDOM);
+    while (start + 1000 < stop) {
+        MP_THREAD_GIL_EXIT();
+        usleep(1000);
+        MP_THREAD_GIL_ENTER();
+        mp_thread_exitpoint(EXITPOINT_ENABLE_SLEEP);
+        mp_handle_pending(true);
+        start = mp_hal_ticks_us();
+    }
+
+    if (stop > start) {
+        MP_THREAD_GIL_EXIT();
+        usleep(stop - start);
+        MP_THREAD_GIL_ENTER();
+        mp_thread_exitpoint(EXITPOINT_ENABLE_SLEEP);
+        mp_handle_pending(true);
+    }
+}
+
+void mp_hal_delay_ms(mp_uint_t ms) {
+    mp_hal_delay_us(ms * 1000);
+}
+///////////////////////////////////////////////////////////////////////////////
+// mp_hal tick ////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+mp_uint_t mp_hal_ticks_ms(void) {
+    struct timespec tv;
+    clock_gettime(CLOCK_MONOTONIC, &tv);
+    return tv.tv_sec * 1000 + tv.tv_nsec / 1000000;
+}
+
+mp_uint_t mp_hal_ticks_us(void) {
+    struct timespec tv;
+    clock_gettime(CLOCK_MONOTONIC, &tv);
+    return tv.tv_sec * 1000000 + tv.tv_nsec / 1000;
+}
+
+uint64_t mp_hal_time_ns(void) {
+    struct timespec tv;
+    clock_gettime(CLOCK_MONOTONIC, &tv);
+    return (uint64_t)tv.tv_sec * 1000000000ULL + (uint64_t)tv.tv_nsec;
+}
+
+mp_uint_t mp_hal_ticks_cpu(void) {
+    uint64_t tick;
+
+    __asm__ __volatile__("rdcycle %0" : "=r" (tick) );
+
+    return tick;
 }

@@ -380,36 +380,18 @@ STATIC mp_obj_t vfs_posix_statvfs(mp_obj_t self_in, mp_obj_t path_in) {
 #include <sys/ioctl.h>
 #include <sys/vfs.h>
 
-#define MISC_DEV_CMD_GET_FS_STAT (0x1024 + 9)
-#define FS_STAT_PATH_LENGTH 32
-
-struct dfs_statfs {
-    size_t f_bsize;   /* block size */
-    size_t f_blocks;  /* total data blocks in file system */
-    size_t f_bfree;   /* free blocks in file system */
-};
-
-struct statfs_wrap {
-    char path[FS_STAT_PATH_LENGTH];
-    struct dfs_statfs sb;
-};
+#include "canmv_drivers.h"
 
 STATIC mp_obj_t vfs_posix_statvfs(mp_obj_t self_in, mp_obj_t path_in) {
     mp_obj_vfs_posix_t *self = MP_OBJ_TO_PTR(self_in);
     const char *path = vfs_posix_get_path_str(self, path_in);
 
-    int fd = -1;
     struct statfs_wrap wrap;
 
     memset(&wrap.sb, 0, sizeof(struct dfs_statfs));
     strncpy(&wrap.path[0], path, FS_STAT_PATH_LENGTH);
 
-    if (0 < (fd = open("/dev/canmv_misc", O_RDONLY))) {
-        if (0x00 != ioctl(fd, MISC_DEV_CMD_GET_FS_STAT, &wrap)) {
-            memset(&wrap.sb, 0, sizeof(struct dfs_statfs));
-        }
-        close(fd);
-    }
+    canmv_misc_dev_ioctl(MISC_DEV_CMD_GET_FS_STAT, &wrap);
 
     mp_obj_tuple_t *t = MP_OBJ_TO_PTR(mp_obj_new_tuple(10, NULL));
     t->items[0] = MP_OBJ_NEW_SMALL_INT(wrap.sb.f_bsize);

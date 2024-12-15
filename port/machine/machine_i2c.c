@@ -40,6 +40,7 @@
 #include "py/obj.h"
 
 #include "modmachine.h"
+#include "canmv_drivers.h"
 
 #define I2C_CHANNEL_MAX 10
 
@@ -561,20 +562,7 @@ STATIC mp_obj_t machine_i2c_make_new(const mp_obj_type_t *type, size_t n_args, s
     machine_i2c_arg_parse(self, n_args - 1, args + 1, &kw_args);
 
     if(self->soft_i2c) {
-#define MISC_DEV_CMD_CREATE_SOFT_I2C    (0x1024 + 7)
-        struct soft_i2c_configure {
-            uint32_t bus_num;
-            uint32_t pin_scl;
-            uint32_t pin_sda;
-            uint32_t freq;
-            uint32_t timeout_ms;
-        } cfg;
-
-        int misc_fd = open("/dev/canmv_misc", O_RDWR);
-
-        if(0 > misc_fd) {
-            mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("can't open misc device"));
-        }
+        struct soft_i2c_configure cfg;
 
         cfg.bus_num = dev_index;
         cfg.pin_scl = machine_i2c_soft_i2c_get_pin_num(self->pin_scl);
@@ -582,12 +570,9 @@ STATIC mp_obj_t machine_i2c_make_new(const mp_obj_type_t *type, size_t n_args, s
         cfg.freq = self->freq;
         cfg.timeout_ms = self->timeout;
 
-        if(0x00 != ioctl(misc_fd, MISC_DEV_CMD_CREATE_SOFT_I2C, &cfg)) {
-            close(misc_fd);
-
+        if(0x00 != canmv_misc_dev_ioctl(MISC_DEV_CMD_CREATE_SOFT_I2C, &cfg)) {
             mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("can't create soft i2c device"));
         }
-        close(misc_fd);
     }
 
     snprintf(dev_name, sizeof(dev_name), "/dev/i2c%d", dev_index);
@@ -630,20 +615,11 @@ STATIC mp_obj_t machine_i2c_deinit(mp_obj_t self_in) {
     i2c_used[self->index] = 0;
 
     if(self->soft_i2c) {
-#define MISC_DEV_CMD_DELETE_SOFT_I2C    (0x1024 + 8)
-        int misc_fd = open("/dev/canmv_misc", O_RDWR);
         uint32_t bus_num = self->index;
 
-        if(0 > misc_fd) {
-            mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("can't open misc device"));
-        }
-
-        if(0x00 != ioctl(misc_fd, MISC_DEV_CMD_DELETE_SOFT_I2C, &bus_num)) {
-            close(misc_fd);
-
+        if(0x00 != canmv_misc_dev_ioctl(MISC_DEV_CMD_DELETE_SOFT_I2C, &bus_num)) {
             mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("can't delete soft i2c device"));
         }
-        close(misc_fd);
     }
 
     return mp_const_none;

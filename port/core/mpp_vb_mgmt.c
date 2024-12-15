@@ -628,7 +628,7 @@ k_s32 vb_mgmt_dump_vicap_frame(vb_mgmt_dump_vicap_config *cfg, vb_mgmt_vicap_ima
         }
     }
 
-    _image->vf_info.v_frame.virt_addr[0] = kd_mpi_sys_mmap_cached(_image->vf_info.v_frame.phys_addr[0], _image->image_size);
+    _image->vf_info.v_frame.virt_addr[0] = (k_u64)kd_mpi_sys_mmap_cached(_image->vf_info.v_frame.phys_addr[0], _image->image_size);
 
     if(0x00 == _image->vf_info.v_frame.virt_addr[0])
     {
@@ -654,7 +654,7 @@ k_s32 vb_mgmt_release_vicap_frame(vb_mgmt_vicap_image *image)
         return 1;
     }
 
-    if(0x00 != (ret += kd_mpi_sys_munmap(image->vf_info.v_frame.virt_addr[0], image->image_size)))
+    if(0x00 != (ret += kd_mpi_sys_munmap((void *)image->vf_info.v_frame.virt_addr[0], image->image_size)))
     {
         printf("release image failed(1).\n");
     }

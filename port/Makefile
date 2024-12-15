@@ -35,10 +35,6 @@ endif
 CDEF = -DCANMV_VER="\"$(CANMV_VER)\""
 
 INC += -I.
-INC += -I$(TOP)
-INC += -I$(TOP)/py
-INC += -I$(TOP)/shared/readline
-INC += -I$(TOP)/lib/crypto-algorithms
 INC += -I$(BUILD)
 INC += -I$(SDK_SRC_ROOT_DIR)/include
 INC += -I$(BOARD_DIR)
@@ -67,6 +63,11 @@ INC += -I$(SDK_RTSMART_SRC_DIR)/mpp/middleware/src/rtsp_server/include
 INC += -I$(SDK_RTSMART_SRC_DIR)/mpp/middleware/src/mp4_format/include
 INC += $(SDK_MPP_USER_INC) $(SDK_RTSMART_INC) $(NNCASE_INC) $(OPENCV_INC)
 
+INC += -I$(TOP)
+INC += -I$(TOP)/py
+INC += -I$(TOP)/shared/readline
+INC += -I$(TOP)/lib/crypto-algorithms
+
 # compiler settings
 # Debugging/Optimization
 ifdef DEBUG
@@ -79,14 +80,16 @@ endif
 # Remove unused sections.
 COPT += -fdata-sections -ffunction-sections
 
+CWARN := -Wall -Werror 
+CWARN += -Wno-int-conversion
+
+CFLAGS += $(INC)
 # Always enable symbols -- They're occasionally useful, and don't make it into the
 # final .bin/.hex/.dfu so the extra size doesn't matter.
 CFLAGS += -g -gdwarf-2
 
-CWARN = -Wall -Werror
-CWARN += -Wno-int-conversion
 CFLAGS += -fopenmp -march=rv64imafdcv -mabi=lp64d -mcmodel=medany
-CFLAGS += $(INC) -std=gnu99 $(COPT) $(CFLAGS_EXTRA) $(CDEF)
+CFLAGS += -std=gnu99 $(COPT) $(CWARN) $(CFLAGS_EXTRA) $(CDEF) 
 
 # Workaround gcc 12 bug.
 CFLAGS += -Wno-array-bounds
@@ -94,34 +97,74 @@ CFLAGS += -Wno-array-bounds
 ifeq ($(MICROPY_PY_TERMIOS),1)
 CFLAGS += -DMICROPY_PY_TERMIOS=1
 endif
-CFLAGS += -DHAVE_CCONFIG_H
 
 CXXFLAGS += -fopenmp -march=rv64imafdcv -mabi=lp64d -mcmodel=medany
 CXXFLAGS += $(INC) $(COPT) $(NNCASEINC) -std=c++20
+CXXFLAGS += $(filter-out -Wmissing-prototypes -Wold-style-definition -std=gnu99, $(CXXFLAGS_MOD))
+
+# Use gcc syntax for map file
+LDFLAGS_ARCH = -Wl,-Map=$@.map,--cref -Wl,--gc-sections
+LDFLAGS += -T core/link.lds --static
+
+# rtsp server
+RTSP_SERVER_LIBS := -L$(SDK_RTSMART_SRC_DIR)/mpp/middleware/lib -lrtsp_server -lliveMedia -lgroupsock -lBasicUsageEnvironment -lUsageEnvironment
+
+LDFLAGS_LIBS := $(NNCASE_LIB_DIR) $(OPENCV_LIB_DIR) $(SDK_MPP_USER_LIB_DIR) $(SDK_MPP_MIDDLEWARE_LIB_DIR) -L$(SDK_CANMV_BUILD_DIR)/freetype/
+LDFLAGS_LIBS += -Wl,--start-group -lm -lpthread -lfreetype -lmp4 $(NNCASE_LIBS) $(OPENCV_LIBS) $(SDK_MPP_USER_LIBS) $(RTSP_SERVER_LIBS) -Wl,--end-group
+
+LDFLAGS += $(LDFLAGS_MOD) $(LDFLAGS_ARCH) $(LDFLAGS_LIBS) $(LDFLAGS_EXTRA)
 
 # remove some python project source files
 PY_O_EXCLUDE = \
 	$(addprefix $(BUILD)/,\
 		extmod/vfs_posix.o \
+		extmod/modos.o \
+		py/modgc.o \
 	)
 PY_O := $(filter-out $(PY_O_EXCLUDE),$(PY_O))
 
 SRC_QSTR_EXCLUDE = \
 		extmod/vfs_posix.c \
+		extmod/modos.c \
+		py/modgc.c
 
 SRC_QSTR := $(filter-out $(SRC_QSTR_EXCLUDE),$(SRC_QSTR))
 
 # source files
-SRC_C += \
-	core/main.c \
-	core/gccollect.c \
-	core/mphalport.c \
-	core/input.c \
-	core/mpthreadport.c \
-	core/mpp_vb_mgmt.c \
-	$(wildcard $(BOARD_DIR)/*.c)
+CANMV_SRC_C :=
 
-SHARED_SRC_C += $(addprefix shared/,\
+# core
+CANMV_SRC_C += $(wildcard core/*.c)
+# board
+CANMV_SRC_C += $(wildcard $(BOARD_DIR)/*.c)
+# machine
+CANMV_SRC_C += $(wildcard machine/*.c)
+# network
+CANMV_SRC_C += $(wildcard network/*.c)
+# mpp
+CANMV_SRC_C += $(wildcard builtin_py/mpp_binding/*.c)
+# kpu
+CANMV_SRC_C += $(wildcard kpu/*.c)
+# aicube
+CANMV_SRC_C += $(wildcard ai_cube/*.c)
+# aidemo
+CANMV_SRC_C += $(wildcard ai_demo/*.c)
+# omv
+CANMV_SRC_C += $(wildcard omv/*.c)
+CANMV_SRC_C += $(wildcard omv/*/*.c)
+# multi_media
+CANMV_SRC_C += $(wildcard multi_media/*.c)
+# drivers
+CANMV_SRC_C += $(wildcard drivers/*.c)
+
+# extmod
+CANMV_SRC_C += \
+	mp_modules/modtermios.c \
+	mp_modules/overlay_modos.c \
+	mp_modules/overlay_modgc.c \
+	mp_modules/overlay_vfs_posix.c \
+
+CANMV_SRC_C += $(addprefix shared/,\
 	runtime/gchelper_generic.c \
 	timeutils/timeutils.c \
 	readline/readline.c \
@@ -129,23 +172,8 @@ SHARED_SRC_C += $(addprefix shared/,\
 	netutils/netutils.c \
 	)
 
-MACHINE_SRC_C = $(wildcard machine/*.c)
-MAIX_SRC_C = $(wildcard maix/*.c)
-MPP_SRC_C = $(wildcard builtin_py/mpp_binding/*.c)
-KPU_SRC_C = $(wildcard kpu/*.c)
-AICUBE_SRC_C = $(wildcard ai_cube/*.c)
-AIDEMO_SRC_C = $(wildcard ai_demo/*.c)
-MODULES_SRC_C = $(wildcard modules/*.c)
-MODULES_SRC_C += $(wildcard modules/*/*.c)
-OMV_SRC_C = $(wildcard omv/*.c)
-OMV_SRC_C += $(wildcard omv/*/*.c)
-MULTIMEDIA_SRC_C = $(wildcard multi_media/*.c)
-OVERLAY_SRC_C = $(wildcard overlay/*.c)
-OVERLAY_SRC_C += $(wildcard overlay/*/*.c)
-
-NETWORK_SRC_C :=
 ifneq ($(filter y,$(CONFIG_ENABLE_NETWORK_RT_WLAN) $(CONFIG_ENABLE_NETWORK_RT_LAN)),)
-    NETWORK_SRC_C += $(wildcard network/*.c)
+    CANMV_SRC_C += $(wildcard network/*.c)
 endif
 
 # LVGL build rules
@@ -174,72 +202,36 @@ LVGL_SRC_C += $(LVGL_BINDING_DIR)/src/hal/lv_hal_tick.c
 LVGL_SRC_C += $(LVGL_BINDING_DIR)/src/libs/png/lodepng.c
 LVGL_SRC_C += $(LVGL_BINDING_DIR)/src/libs/png/lv_png.c
 
+CANMV_SRC_C += $(LVGL_SRC_C)
+
 # freetype build
 $(SDK_CANMV_BUILD_DIR)/_ft.c:
 	@$(MAKE) -C 3rd-party/freetype
 	@echo "// place holder" > $(SDK_CANMV_BUILD_DIR)/_ft.c
 
-FREETYPE_C = $(SDK_CANMV_BUILD_DIR)/_ft.c
+CANMV_SRC_C += $(SDK_CANMV_BUILD_DIR)/_ft.c
 CLEAN_EXTRA += $(FREETYPE_C) $(LVGL_PP) $(LVGL_MPY)
 
-SRC_C += \
-	${MACHINE_SRC_C} \
-	${MAIX_SRC_C} \
-	${MPP_SRC_C} \
-	${KPU_SRC_C} \
-	${NETWORK_SRC_C} \
-	${OMV_SRC_C} \
-	${AICUBE_SRC_C} \
-	${AIDEMO_SRC_C} \
-	${MODULES_SRC_C} \
-	${LVGL_SRC_C} \
-	${FREETYPE_C} \
-	${MULTIMEDIA_SRC_C} \
-	${OVERLAY_SRC_C}
+# cpp source files
+CANMV_SRC_CXX := 
+CANMV_SRC_CXX += $(wildcard kpu/*.cpp)
+CANMV_SRC_CXX += $(wildcard ai_cube/*.cpp)
+CANMV_SRC_CXX += $(wildcard ai_demo/*.cpp)
+CANMV_SRC_CXX += $(wildcard ai_demo/kws/*.cpp)
+CANMV_SRC_CXX += $(wildcard ai_demo/tts_zh/*.cpp)
+CANMV_SRC_CXX += $(wildcard modules/*.cpp)
+CANMV_SRC_CXX += $(wildcard modules/*/*.cpp)
+CANMV_SRC_CXX += $(wildcard multi_media/*.cpp)
 
-KPU_SRC_CXX = $(wildcard kpu/*.cpp)
-AICUBE_SRC_CXX = $(wildcard ai_cube/*.cpp)
-AIDEMO_SRC_CXX = $(wildcard ai_demo/*.cpp)
-AIDEMO_KWS_SRC_CXX = $(wildcard ai_demo/kws/*.cpp)
-AIDEMO_TTS_ZH_SRC_CXX = $(wildcard ai_demo/tts_zh/*.cpp)
-MODULES_SRC_CXX = $(wildcard modules/*.cpp)
-MODULES_SRC_CXX += $(wildcard modules/*/*.cpp)
-MULTIMEDIA_SRC_CXX = $(wildcard multi_media/*.cpp)
-
-SRC_CXX += \
-	${KPU_SRC_CXX} \
-	${AICUBE_SRC_CXX} \
-	${AIDEMO_SRC_CXX} \
-	${AIDEMO_KWS_SRC_CXX} \
-	${AIDEMO_TTS_ZH_SRC_CXX} \
-	${MODULES_SRC_CXX} \
-	${MULTIMEDIA_SRC_CXX}
-
+# 
 OBJ = $(PY_O)
-OBJ += $(addprefix $(BUILD)/, $(SRC_C:.c=.o))
-OBJ += $(addprefix $(BUILD)/, $(SRC_CXX:.cpp=.o))
-OBJ += $(addprefix $(BUILD)/, $(SHARED_SRC_C:.c=.o))
+OBJ += $(addprefix $(BUILD)/, $(CANMV_SRC_C:.c=.o))
+OBJ += $(addprefix $(BUILD)/, $(CANMV_SRC_CXX:.cpp=.o))
 
 # List of sources for qstr extraction
-SRC_QSTR += $(SRC_C) $(SRC_CXX) $(SHARED_SRC_C)
+SRC_QSTR += $(CANMV_SRC_C) $(CANMV_SRC_CXX)
 # Append any auto-generated sources that are needed by sources listed in
 # SRC_QSTR
 SRC_QSTR_AUTO_DEPS +=
-
-CXXFLAGS += $(filter-out -Wmissing-prototypes -Wold-style-definition -std=gnu99, $(CXXFLAGS_MOD))
-CFLAGS += $(CWARN)
-
-# Use gcc syntax for map file
-LDFLAGS_ARCH = -Wl,-Map=$@.map,--cref -Wl,--gc-sections
-LDFLAGS += -T core/link.lds --static
-
-# rtsp server
-RTSP_SERVER_LIBS := 
-RTSP_SERVER_LIBS += -L$(SDK_RTSMART_SRC_DIR)/mpp/middleware/lib -lrtsp_server -lliveMedia -lgroupsock -lBasicUsageEnvironment -lUsageEnvironment
-
-LDFLAGS_LIBS := $(NNCASE_LIB_DIR) $(OPENCV_LIB_DIR) $(SDK_MPP_USER_LIB_DIR) $(SDK_MPP_MIDDLEWARE_LIB_DIR) -L$(SDK_CANMV_BUILD_DIR)/freetype/
-LDFLAGS_LIBS += -Wl,--start-group -lm -lpthread -lfreetype -lmp4 $(NNCASE_LIBS) $(OPENCV_LIBS) $(SDK_MPP_USER_LIBS) $(RTSP_SERVER_LIBS) -Wl,--end-group
-
-LDFLAGS += $(LDFLAGS_MOD) $(LDFLAGS_ARCH) $(LDFLAGS_LIBS) $(LDFLAGS_EXTRA)
 
 include $(TOP)/py/mkrules.mk

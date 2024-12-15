@@ -81,17 +81,3 @@ static inline int mp_hal_readline(vstr_t *vstr, const char *p) {
             break; \
         } \
 }
-
-#define RAISE_ERRNO(err_flag, error_val) \
-    { if (err_flag == -1) \
-      { mp_raise_OSError(error_val); } }
-
-void mp_hal_get_random(size_t n, void *buf);
-
-#if MICROPY_PY_BLUETOOTH
-enum {
-    MP_HAL_MAC_BDADDR,
-};
-
-void mp_hal_get_mac(int idx, uint8_t buf[6]);
-#endif
