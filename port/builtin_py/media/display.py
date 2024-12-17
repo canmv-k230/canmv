@@ -52,8 +52,14 @@ class Display:
             if not isinstance(layer_config, Display.LayerConfig):
                 raise TypeError("layer_config is not Display.LayerConfig")
 
+            self.src = src
+            self.dst = dst
             self.layer_config = layer_config
-            self.linker = MediaManager.link(src, dst)
+
+            self.linker = None
+
+        def bind(self):
+            self.linker = MediaManager.link(self.src, self.dst)
 
         def __del__(self):
             self.linker.__del__()
@@ -171,6 +177,8 @@ class Display:
         cls._layer_bind_cfg[layer] = Display.BindConfig(src, dst, layer_config)
 
         if cls._is_inited:
+            cls._layer_bind_cfg[layer].bind()
+
             if (Display.LAYER_VIDEO1 <= layer <= Display.LAYER_VIDEO2):
                 cls.__config_video_layer(layer_config)
             elif (Display.LAYER_OSD0 <= layer <= Display.LAYER_OSD3):
@@ -349,6 +357,8 @@ class Display:
 
         for i in range(0, K_VO_MAX_CHN_NUMS):
             if isinstance(cls._layer_bind_cfg[i], Display.BindConfig):
+                cls._layer_bind_cfg[i].bind()
+
                 if (Display.LAYER_VIDEO1 <= i <= Display.LAYER_VIDEO2):
                     cls.__config_video_layer(cls._layer_bind_cfg[i].layer_config)
                 elif (Display.LAYER_OSD0 <= i <= Display.LAYER_OSD3):

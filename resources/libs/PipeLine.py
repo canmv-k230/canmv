@@ -86,10 +86,6 @@ class PipeLine:
                 # 设置为ST7701显示，默认480x800
                 Display.init(Display.ST7701, width=self.display_size[0], height=self.display_size[1], osd_num=self.osd_layer_num, to_ide=True)
 
-            # 设置bind通道的帧率，防止生产者太快
-            display_fps = Display.fps()
-            self.sensor._set_chn_fps(chn = CAM_CHN_ID_0, fps = display_fps)
-
             # media初始化
             MediaManager.init()
             # 启动sensor

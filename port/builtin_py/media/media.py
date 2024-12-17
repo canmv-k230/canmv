@@ -287,6 +287,15 @@ class MediaManager:
         dst_mpp.dev_id = dst[1]
         dst_mpp.chn_id = dst[2]
 
+        if dst_mpp.mod_id == DISPLAY_MOD_ID and dst_mpp.dev_id == DISPLAY_DEV_ID:
+            if src_mpp.mod_id == CAMERA_MOD_ID:
+                from .sensor import Sensor
+                from .display import Display
+
+                sensor = Sensor._devs[src_mpp.dev_id]
+                if isinstance(sensor, Sensor):
+                    sensor._set_chn_fps(chn = src_mpp.chn_id, fps = Display.fps())
+
         ret = kd_mpi_sys_bind(src_mpp, dst_mpp)
         if ret:
             raise RuntimeError(f"MediaManager link {src} to {dst} failed({ret})")
