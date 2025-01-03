@@ -103,3 +103,4 @@ clean:
 	@make -C port clean
 
 distclean: clean
+	@rm -rf $(SDK_CANMV_BUILD_DIR)
